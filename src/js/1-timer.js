@@ -1,91 +1,86 @@
-import flatpickr from 'flatpickr';
-import 'flatpickr/dist/flatpickr.min.css';
-import iziToast from 'izitoast';
-import 'izitoast/dist/css/iziToast.min.css';
+import flatpickr from "flatpickr";
+import "flatpickr/dist/flatpickr.min.css";
+import iziToast from "izitoast";
+import "izitoast/dist/css/iziToast.min.css";
 
-const objectsLinks = {
-  dateInput: document.querySelector('#datetime-picker'),
-  startBtn: document.querySelector('[data-start]'),
-  days: document.querySelector('[data-days]'),
-  hours: document.querySelector('[data-hours]'),
-  minutes: document.querySelector('[data-minutes]'),
-  seconds: document.querySelector('[data-seconds]'),
-};
+const dateInput = document.querySelector("#datetime-picker");
+const startButton = document.querySelector("[data-start]");
 
 let userSelectedDate = null;
-let timerId = null;
-objectsLinks.startBtn.disabled = true;
+startButton.disabled = true;
 
-flatpickr(objectsLinks.dateInput, {
-  enableTime: true,
-  time_24hr: true,
-  defaultDate: new Date(),
-  minuteIncrement: 1,
-  onClose(selectedDates) {
-    userSelectedDate = selectedDates[0];
-    objectsLinks.startBtn.disabled = userSelectedDate <= new Date();
-    if (objectsLinks.startBtn.disabled) {
-      iziToast.error({ message: 'Please choose a date in the future' });
-    } else {
-      console.log('Выбранная дата:', formatDate(userSelectedDate));
+const options = {
+    enableTime: true,
+    time_24hr: true,
+    minuteIncrement: 1,
+    onClose(selectedDates) {
+        const selectedDate = selectedDates[0];
+        if (selectedDate <= Date.now()) {
+            iziToast.warning({
+                title: "Warning",
+                message: "Please choose a date in the future",
+                position: "topRight"
+            });
+            startButton.disabled = true;
+        } else {
+            startButton.disabled = false;
+            userSelectedDate = selectedDate;
+        }
     }
-  },
+};
+
+flatpickr(dateInput, options);
+
+let countdownInterval = null;
+startButton.addEventListener("click", () => {
+    if (!userSelectedDate) return;
+    startButton.disabled = true;
+    dateInput.disabled = true;
+
+    startCountdown();
 });
+ 
+function startCountdown() { 
+    countdownInterval = setInterval(() => {
+        const currentDate = Date.now();
+        const leftTime = userSelectedDate - currentDate;
+        if(leftTime <= 0) {
+            clearInterval(countdownInterval);
+            updateTimerDisplay(0, 0, 0, 0);
+            iziToast.success({
+                title: "Done",
+                message: "Countdown finished!",
+                position: "topRight"
+            });
+            dateInput.disabled = false;
+            return;
+        }
+        const { days, hours, minutes, seconds } = convertMs(leftTime);
+        updateTimerDisplay(days, hours, minutes, seconds);
+    }, 1000);
+};
 
-objectsLinks.startBtn.addEventListener('click', () => {
-  objectsLinks.startBtn.disabled = true;
-  objectsLinks.dateInput.disabled = true;
-  updateTimer();
-  timerId = setInterval(updateTimer, 1000);
-});
-
-function updateTimer() {
-  const timeLeft = userSelectedDate - new Date();
-  if (timeLeft <= 0) {
-    clearInterval(timerId);
-    objectsLinks.dateInput.disabled = false;
-    setTimerDisplay(0, 0, 0, 0);
-    return;
-  }
-  const { days, hours, minutes, seconds } = convertMs(timeLeft);
-  setTimerDisplay(days, hours, minutes, seconds);
-}
-
-function setTimerDisplay(days, hours, minutes, seconds) {
-  Object.assign(objectsLinks, {
-    days: (objectsLinks.days.textContent = addLeadingZero(days)),
-    hours: (objectsLinks.hours.textContent = addLeadingZero(hours)),
-    minutes: (objectsLinks.minutes.textContent = addLeadingZero(minutes)),
-    seconds: (objectsLinks.seconds.textContent = addLeadingZero(seconds)),
-  });
-}
+function updateTimerDisplay(days, hours, minutes, seconds) { 
+    document.querySelector("[data-days]").textContent = addLeadingZero(days);
+    document.querySelector("[data-hours]").textContent = addLeadingZero(hours);
+    document.querySelector("[data-minutes]").textContent = addLeadingZero(minutes);
+    document.querySelector("[data-seconds]").textContent = addLeadingZero(seconds);
+};
 
 function addLeadingZero(value) {
-  return String(value).padStart(2, '0');
-}
-
-function formatDate(date) {
-  return date
-    .toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
-    .replace(',', ' часы');
-}
+    return value.toString().padStart(2, "0");
+};
 
 function convertMs(ms) {
-  const second = 1000,
-    minute = second * 60,
-    hour = minute * 60,
-    day = hour * 24;
-  return {
-    days: Math.floor(ms / day),
-    hours: Math.floor((ms % day) / hour),
-    minutes: Math.floor((ms % hour) / minute),
-    seconds: Math.floor((ms % minute) / second),
-  };
+   const second = 1000;
+  const minute = second * 60;
+  const hour = minute * 60;
+  const day = hour * 24;
+
+  const days = Math.floor(ms / day);
+  const hours = Math.floor((ms % day) / hour);
+  const minutes = Math.floor(((ms % day) % hour) / minute);
+  const seconds = Math.floor((((ms % day) % hour) % minute) / second);
+
+  return { days, hours, minutes, seconds };
 }
